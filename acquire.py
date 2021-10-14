@@ -1,155 +1,140 @@
-import numpy as np
-import pandas as pd
-import os
+# Time Series: Data Acquisition Exercises
 
-# Used to obtain information from websites
-import requests
+#Function for Exercise #1
+#------------------------
+# 1. Using the code from the lesson as a guide
+# and the REST API from https://python.zgulde.net/api/v1/items as we did in the lesson, 
+# #create a dataframe named items that has all of the data for items.
 
-# Website that we are getting data from:
-# https://python.zgulde.net/api/v1/items
+#This function acquires data from a REST API at the url above and returns a dataframe containing all the items
 
+def get_items():
 
+    import pandas as pd
+    import requests  
 
-def get_items(cached=False):
-    '''
-    This function creates a request from the REST API and transforms the response into a pandas dataframe.
-    Then it saves the dataframe as a local csv file.
-    '''
-    # If the cached parameter is false, or it there is no local csv file, then create a new dataframe from the database
-    if cached == False or os.path.isfile('items.csv') == False:
-        
-        # Create an empty list that will be appended at each iteration
-        items_list = []
+    # Define base url to obtain api from
+    url= 'https://python.zgulde.net'
 
-        # Define the url where the data is kept
-        base_url = "https://python.zgulde.net/api/v1/items"
+    # create response containing the contents of the response from the api
+    response = requests.get(url + '/api/v1/items')
 
-        # Define the response from the request
-        response = requests.get(base_url)
+    #Turn that .json content into a dictionary for use with Python
+    data = response.json()
 
-        # Convert the response to JSON
-        data = response.json()
+    #Create a dataframe containing the dictionary created from the .json sent by the api
+    df_items = pd.DataFrame(data['payload']['items'])
 
-        # Define the number of pages
-        n = data['payload']['max_pages']
-
-        # Create a loop to iterate through each page
-        for i in range(1, n+1):
-
-            # Define the new url for the next page
-            new_url = base_url+"?page="+str(i)
-
-            # Define the response
-            response = requests.get(new_url)
-
-            # Convert the response to json
-            data = response.json()
-
-            # Create variable to current interations
-            page_items = data['payload']['items']
-
-            # Create variable to hold all iterations
-            items_list += page_items
-
-        # Create dataframe to hold items
-        items = pd.DataFrame(items_list)
-
-        # Save to csv
-        items.to_csv('items.csv')
-
-    else:
-        # Get the data from local csv
-        items = pd.read_csv('items.csv', index_col=0)
+    return df_items
 
 
+#Function for Exercise #2
+#------------------------
+# 2. Do the same thing as #1, but for stores (https://python.zgulde.net/api/v1/stores)
+
+#This function acquires data from a REST API at the url above and returns a dataframe containing all the stores
+
+def get_stores():
+
+    import pandas as pd
+    import requests  
+
+    # Define base url to obtain api from
+    url= 'https://python.zgulde.net'
+
+    # create response containing the stores from the api
+    response_stores = requests.get(url + '/api/v1/stores')
+
+    #Turn that .json content into a dictionary for use with Python
+    data_stores = response_stores.json()
+
+    #Create a dataframe containing the dictionary created from the .json sent by the api
+    df_stores = pd.DataFrame(data_stores['payload']['stores'])
+
+    return df_stores
+
+#Function for Exercise #3
+#------------------------
+# 2. Extract the data for sales (https://python.zgulde.net/api/v1/sales). 
+# There are a lot of pages of data here, so your code will need to be a little more complex. 
+# Your code should continue fetching data from the next page until all of the data is extracted. 
+
+#This function acquires data from a REST API at the url above and returns a dataframe containing all the sales
+
+def get_sales():
+
+    import pandas as pd
+    import requests  
+
+    # Define base url to obtain api from
+    url= 'https://python.zgulde.net'
+
+    #Iterating thru every page and concatenating the sales info from each page, we create a loop
+
+    #acquire .json from url
+    response_sales = requests.get(url + '/api/v1/sales')
+
+    #turn .json content into dictionary
+    data_sales = response_sales.json()
+
+    #turn dictionary into a dataframe
+    df_sales = pd.DataFrame(data_sales['payload']['sales'])
+
+    #Get ready to iterate thru all pages 
+    num_pages = data_sales['payload']['max_page']
+
+    # loop thru the iterations
+    for i in range(1,num_pages):
+
+        response_sales = requests.get(url + data_sales['payload']['next_page'])
+        data_sales = response_sales.json()
+        df_sales = pd.concat([df_sales, pd.DataFrame(data_sales['payload']['sales'])])
+
+    return df_sales    
+ 
+
+#Function for Exercise #4
+#------------------------
+#4. Save the data in your files to local csv files so that it will be faster to access in the future.
+
+#This function calls the get_sales function and creates a .csv with sales data and saves it locally
+def create_sales_data_csv():
+
+    df_sales = get_sales()
+
+    #create a csv from sales data and store locally
+    df_sales.to_csv('sales.csv')
 
 
-def get_stores(cached==False):
-    if cached == False or os.path.isfil('stores.csv') == False:
-        stores_list = []
-        base_url = 'https://python.zach.lol/api/v1/stores'
-        response = requests.get(base_url)
-        data = response.json()
-        n = data['payload']['max_pages']
+#Function for Exercise #5
+#------------------------
+# Combine the data from your three separate dataframes into one large dataframe.
 
-        for i in range(1, n+1):
-            new_url = base_url + '?page=' + str(i)
-            response = requests.get(new_url)
-            data = response.json()
-            page_stores = data['payload']['stores']
-            stores_list += page_stores
+#This function calls 3 functions that get sales, stores, and items and concatenates and returns all the data in one dataframe
 
-        stores = pd.DataFrame(stores_list)
-        stores.to_csv('stores.csv')
+def combine_sales_stores_items_data():
 
-    else:
-        stores = pd.read_csv('stores.csv', index_col=0)
-    
-    return stores
+    import pandas as pd
+
+    df_sales = get_sales()
+    df_stores = get_stores()
+    df_items = get_items()
+
+    df_sales_and_stores = pd.merge(df_sales, df_stores, how='left', left_on='store' , right_on='store_id')
+
+    df_all = pd.merge(df_sales_and_stores, df_items, how='left', left_on='item', right_on='item_id')
+
+    return df_all
 
 
+#Function for Exercise #6
+#------------------------
+#This function reads data from a link to a .csv file and returns a dataframe
 
-def get_sales(cached=False):
-    # If cached is false or there is no local csv, then read from database
-    if cached == False or os.path.isfile('sales.csv') == False:
-        sales_list = []
-        url = 'https://python.zach.lol/api/v1/sales'
-        response = requests.get(url)
-        data = response.json()
-        n = data['payload']['page']
+def csv_to_df(url):
 
-        for i in range(1, n+1):
-            new_url = url + "?page=" + str(i)
-            response = requests.get(new_url)
-            data = response.json()
-            page_sales = data['payload']['sales']
-            sales_list += page_sales
+    import pandas as pd
 
-        sales = pd.DataFrame(sales_list)
-        sales.to_csv('sales.csv')
+    df_from_csv = pd.read_csv(url)
 
-    else:
-        sales = pd.read_csv('sales.csv', index_col = 0)
-
-    return sales
-
-
-
-def combine_df(cached=False):
-    if cached == False
-        # Get the data
-        sales = get_sales(cached=True)
-        stores = get_stores(cached=True)
-        items = get_items(cached=True)
-
-        # In sales, rename store to store_id and item to item_id
-        sales.columns = ['item_id', 'sale_amount', 'sale_date', 'sale_id', 'store_id']
-
-        # Join sales and stores
-        sales_stores = pd.merge(sales, stores, how='inner', on='store_id')
-
-        # Join items to sales_stores
-        sales_stores_items = pd.merge(sales_stores, items, how='inner', on='item_id')
-
-        # Save as local csv
-        sales_stores_items.to_csv('sales_stores_items')
-
-    else:
-        # Read the file locally
-        sales_stores_items = pd.read_csv('sales_stores_items.csv', index_col=0)
-    
-    return sales_stores_items
-
-
-
-def get_power_data():
-    base_url = 'https://raw.githubusercontent.com/jenfly/opsd/master/opsd_germany_daily.csv'
-    power_df = pd.read_csv(base_url)
-    return power_df
-
-
-
-
-
-
-
+    return df_from_csv
